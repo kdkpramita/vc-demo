@@ -1,5 +1,2 @@
 streamlit
-flask
-pandas
-numpy
-matplotlib
+cryptography
