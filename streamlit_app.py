@@ -43,6 +43,11 @@ h1 {
     color: white;
     text-align: center;
 }
+.subtitle {
+    text-align: center;
+    font-size: 18px;
+    color: white;
+}
 .stButton>button {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -62,8 +67,9 @@ h1 {
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🎓 Verifiable Credential System")
-st.write("Sistem Kredensial Digital yang Aman dan Terverifikasi")
+# Judul & Subjudul di tengah
+st.markdown("<h1>🎓 Verifiable Credential System</h1>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle'>Sistem Kredensial Digital yang Aman dan Terverifikasi</p>", unsafe_allow_html=True)
 st.write("---")
 
 # Layout dua kolom
@@ -80,7 +86,8 @@ with col1:
         grade = st.text_input("Grade / Nilai")
         generate_btn = st.form_submit_button("Generate Credential")
 
-    if generate_btn:  # <- pindah ke luar form
+    # ✅ Letakkan di luar form
+    if generate_btn:
         if not name or not course or not grade:
             st.error("Semua field harus diisi!")
         else:
@@ -112,9 +119,8 @@ with col1:
             }
 
             filename = f"credential_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            st.success("✅ Credential berhasil dibuat!")
 
-            # ✅ Download button di luar form
+            st.success("✅ Credential berhasil dibuat!")
             st.download_button(
                 "📥 Download Credential",
                 data=json.dumps(vc, indent=2),
@@ -144,5 +150,5 @@ with col2:
             )
             st.success("🎉 Verifikasi Berhasil! Credential valid dan asli.")
             st.json(vc)
-        except Exception as e:
+        except Exception:
             st.error("❌ Credential tidak valid atau telah dimodifikasi.")
