@@ -80,44 +80,47 @@ with col1:
         grade = st.text_input("Grade / Nilai")
         generate_btn = st.form_submit_button("Generate Credential")
 
-        if generate_btn:
-            if not name or not course or not grade:
-                st.error("Semua field harus diisi!")
-            else:
-                vc = {
-                    "@context": ["https://www.w3.org/2018/credentials/v1"],
-                    "type": ["VerifiableCredential", "CourseCertificate"],
-                    "issuer": "did:univ:1234",
-                    "issuanceDate": datetime.utcnow().isoformat() + "Z",
-                    "credentialSubject": {
-                        "id": "did:student:5678",
-                        "name": name,
-                        "course": course,
-                        "grade": grade
-                    }
+    if generate_btn:  # <- pindah ke luar form
+        if not name or not course or not grade:
+            st.error("Semua field harus diisi!")
+        else:
+            vc = {
+                "@context": ["https://www.w3.org/2018/credentials/v1"],
+                "type": ["VerifiableCredential", "CourseCertificate"],
+                "issuer": "did:univ:1234",
+                "issuanceDate": datetime.utcnow().isoformat() + "Z",
+                "credentialSubject": {
+                    "id": "did:student:5678",
+                    "name": name,
+                    "course": course,
+                    "grade": grade
                 }
+            }
 
-                message = json.dumps(vc, sort_keys=True).encode()
-                signature = private_key.sign(
-                    message,
-                    padding.PKCS1v15(),
-                    hashes.SHA256()
-                )
+            message = json.dumps(vc, sort_keys=True).encode()
+            signature = private_key.sign(
+                message,
+                padding.PKCS1v15(),
+                hashes.SHA256()
+            )
 
-                vc["proof"] = {
-                    "type": "RSASignature2018",
-                    "created": datetime.utcnow().isoformat() + "Z",
-                    "verificationMethod": "did:univ:1234#keys-1",
-                    "signatureValue": signature.hex()
-                }
+            vc["proof"] = {
+                "type": "RSASignature2018",
+                "created": datetime.utcnow().isoformat() + "Z",
+                "verificationMethod": "did:univ:1234#keys-1",
+                "signatureValue": signature.hex()
+            }
 
-                filename = f"credential_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                with open(filename, "w") as f:
-                    json.dump(vc, f, indent=2)
+            filename = f"credential_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            st.success("✅ Credential berhasil dibuat!")
 
-                st.success("✅ Credential berhasil dibuat!")
-                st.download_button("📥 Download Credential", data=json.dumps(vc, indent=2),
-                                   file_name=filename, mime="application/json")
+            # ✅ Download button di luar form
+            st.download_button(
+                "📥 Download Credential",
+                data=json.dumps(vc, indent=2),
+                file_name=filename,
+                mime="application/json"
+            )
 
 # -------------------------------
 # Verify Credential
