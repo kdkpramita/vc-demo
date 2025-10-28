@@ -1,34 +1,15 @@
 import streamlit as st
 import json
+import hashlib
 from datetime import datetime
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives import serialization, hashes
 import os
 
 # ===============================
-# Generate / Load Key Pair
+# Fungsi untuk membuat hash SHA-256
 # ===============================
-if not os.path.exists("issuer_private.pem"):
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    public_key = private_key.public_key()
-
-    with open("issuer_private.pem", "wb") as f:
-        f.write(private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption()
-        ))
-
-    with open("issuer_public.pem", "wb") as f:
-        f.write(public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        ))
-else:
-    with open("issuer_private.pem", "rb") as f:
-        private_key = serialization.load_pem_private_key(f.read(), password=None)
-    with open("issuer_public.pem", "rb") as f:
-        public_key = serialization.load_pem_public_key(f.read())
+def generate_hash(data):
+    """Menghasilkan hash SHA-256 dari data JSON"""
+    return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
 # ===============================
 # Streamlit UI
@@ -69,7 +50,7 @@ h1 {
 
 # Judul & Subjudul di tengah
 st.markdown("<h1>🎓 Verifiable Credential System</h1>", unsafe_allow_html=True)
-st.markdown("<p class='subtitle'>Sistem Kredensial Digital yang Aman dan Terverifikasi</p>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle'>Sistem Kredensial Digital Aman & Terverifikasi (Hash-based)</p>", unsafe_allow_html=True)
 st.write("---")
 
 # Layout dua kolom
@@ -86,11 +67,11 @@ with col1:
         grade = st.text_input("Grade / Nilai")
         generate_btn = st.form_submit_button("Generate Credential")
 
-    # ✅ Letakkan di luar form
     if generate_btn:
         if not name or not course or not grade:
             st.error("Semua field harus diisi!")
         else:
+            # Membuat struktur credential
             vc = {
                 "@context": ["https://www.w3.org/2018/credentials/v1"],
                 "type": ["VerifiableCredential", "CourseCertificate"],
@@ -104,23 +85,18 @@ with col1:
                 }
             }
 
-            message = json.dumps(vc, sort_keys=True).encode()
-            signature = private_key.sign(
-                message,
-                padding.PKCS1v15(),
-                hashes.SHA256()
-            )
-
+            # 🔐 Tambahkan hash
+            vc_hash = generate_hash(vc)
             vc["proof"] = {
-                "type": "RSASignature2018",
+                "type": "HashSHA256Proof",
                 "created": datetime.utcnow().isoformat() + "Z",
-                "verificationMethod": "did:univ:1234#keys-1",
-                "signatureValue": signature.hex()
+                "verificationMethod": "did:univ:1234#hash",
+                "hashValue": vc_hash
             }
 
             filename = f"credential_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
-            st.success("✅ Credential berhasil dibuat!")
+            st.success("✅ Credential berhasil dibuat dan dilindungi dengan hash!")
             st.download_button(
                 "📥 Download Credential",
                 data=json.dumps(vc, indent=2),
@@ -138,17 +114,20 @@ with col2:
     if uploaded_file:
         try:
             vc = json.load(uploaded_file)
-            proof = vc.pop("proof")
-            message = json.dumps(vc, sort_keys=True).encode()
-            signature = bytes.fromhex(proof["signatureValue"])
+            proof = vc.get("proof", None)
 
-            public_key.verify(
-                signature,
-                message,
-                padding.PKCS1v15(),
-                hashes.SHA256()
-            )
-            st.success("🎉 Verifikasi Berhasil! Credential valid dan asli.")
-            st.json(vc)
-        except Exception:
-            st.error("❌ Credential tidak valid atau telah dimodifikasi.")
+            if proof and "hashValue" in proof:
+                stored_hash = proof["hashValue"]
+                # Buang bagian proof sebelum hashing ulang
+                vc.pop("proof")
+                recalculated_hash = generate_hash(vc)
+
+                if stored_hash == recalculated_hash:
+                    st.success("🎉 Verifikasi Berhasil! Credential valid dan belum dimodifikasi.")
+                    st.json(vc)
+                else:
+                    st.error("❌ Credential tidak valid atau telah dimodifikasi.")
+            else:
+                st.warning("⚠️ File tidak memiliki hash untuk diverifikasi.")
+        except Exception as e:
+            st.error(f"Terjadi kesalahan saat verifikasi: {e}")
